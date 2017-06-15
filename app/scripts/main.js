@@ -19,6 +19,7 @@
 (function() {
   'use strict';
 
+  
   var QRCodeCamera = function(element) {
     // Controls the Camera and the QRCode Module
 
@@ -30,6 +31,12 @@
       // There is a frame in the camera, what should we do with it?
  
       var imageData = cameraManager.getImageData();
+	  // qrWorker.postMessage(imageData);
+		// qrWorker.onmessage = function(e) {
+			// if(e !== undefined) {
+			// qrCodeManager.showDialog(e);
+        // }
+		// }
       var detectedQRCode = qrCodeManager.detectQRCode(imageData, function(url) {
         if(url !== undefined) {
           qrCodeManager.showDialog(url);
@@ -46,8 +53,9 @@
     var qrcodeNavigate = root.querySelector(".QRCodeSuccessDialog-navigate");
     var qrcodeIgnore = root.querySelector(".QRCodeSuccessDialog-ignore");
 
-    var client = new QRClient();
-
+    // var client = new QRClient();
+	var qrWorker = new Worker('scripts/jsqrcode/qrworker.js');
+	
     var self = this;
 
     this.currentUrl = undefined;
@@ -55,13 +63,29 @@
 
     this.detectQRCode = function(imageData, callback) {
       callback = callback || function() {};
-
-      client.decode(imageData, function(result) {
-        if(result !== undefined) {
-          self.currentUrl = result;
+		qrWorker.postMessage(imageData);
+		qrWorker.onmessage = function(e) {
+			var url = e.data;
+			if(url !== undefined) {
+			self.currentUrl = url;
         }
-        callback(result);
-      });
+			callback(url);
+		};
+		
+		qrWorker.onerror = function(error){
+			function WorkerException(message){
+				this.name = "WorkerException";
+				this.message = message;
+			}
+			throw new WorkerException('Decoder error');
+			callback(undefined);
+		};
+      // client.decode(imageData, function(result) {
+        // if(result !== undefined) {
+          // self.currentUrl = result;
+        // }
+        // callback(result);
+      // });
     };
 
     this.showDialog = function(url) {
@@ -191,6 +215,7 @@
       if(self.onframe) self.onframe();
 
       coordinatesHaveChanged = false;
+	  requestAnimationFrame(captureFrame);
     };
 
     var getCamera = function(videoSource, cb) {
@@ -221,7 +246,8 @@
           
           var isSetup = setupVariables(e);
           if(isSetup) {
-            setInterval(captureFrame.bind(self), 4);
+            // setInterval(captureFrame.bind(self), 4);
+			requestAnimationFrame(captureFrame.bind(self));
           }
           else {
             // This is just to get around the fact that the videoWidth is not
@@ -229,7 +255,8 @@
             setTimeout(function() {
               setupVariables(e);
 
-              setInterval(captureFrame.bind(self), 4);
+              // setInterval(captureFrame.bind(self), 4);
+			  requestAnimationFrame(captureFrame.bind(self));
             }, 100);
           }
 
